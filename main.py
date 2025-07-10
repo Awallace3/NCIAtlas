@@ -280,7 +280,7 @@ def plot_violin_errors():
             {
                 "df": df,
                 "label": "",
-                "ylim": [[-10.0, 10.0]],
+                "ylim": [[-2.0, 10.0] for i in range(5)],
             }
         ]
         print(f)
@@ -300,7 +300,7 @@ def plot_violin_errors():
         {
             "df": pd.concat(master_df, ignore_index=True),
             "label": "",
-            "ylim": [[-10.0, 10.0]],
+            "ylim": [[-2.0, 10.0] for i in range(5)],
         }
     ]
     db_name = f.split("/")[-1].replace("_dapnet.pkl", ".png")
