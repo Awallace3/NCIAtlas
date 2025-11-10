@@ -24,6 +24,7 @@ lots = {
     # "MP2/aTZ/CP": "",
     # "MP2/a5Z/CP": "",
     "HF/aDZ": "HF/aug-cc-pVDZ/CP",
+    # "HF/aTZ": "HF/aug-cc-pVTZ/CP",
     "HF/haTZ": "HF/aug-cc-pVTZ/CP",
     "HF/aQZ": "HF/aug-cc-pVQZ/CP",
     "MP2/aDZ/CP": "MP2/aug-cc-pVDZ/CP",
@@ -153,7 +154,7 @@ def create_pandas_dfs():
 
 
 def update_colunn_names_to_match_bfdb(df):
-    if "corr_CCSD(T)/aDZ" not in df.columns:
+    if "corr_CCSD(T)/aDZ" not in df.columns and 'corr_CCSD(T)/haTZ' not in df.columns:
         print("No CCSD(T)/aDZ column found, skipping update.")
         return df
     mp2_col_names = [i for i in df.columns if ("MP2/" in i and "CBS" not in i)]
@@ -174,15 +175,21 @@ def update_colunn_names_to_match_bfdb(df):
         mp2_val = i.replace("corr_CCSD(T)", "corr_MP2")
         df[method] = df[i] + df[hf_val] + df[mp2_val]
     df["MP2/CBS/CP"] = df["HF/aQZ"] + df["corr_MP2/CBS(aTQZ)"]
-    df["CCSD(T)/CBS/CP"] = (
-        df["HF/aQZ"]
-        + df["corr_MP2/CBS(aTQZ)"]
-        + df["corr_CCSD(T)/aDZ"]
-        - df["corr_MP2/aDZ"]
-    )
-    print(df)
-    pp(df.columns.values.tolist())
-    print(df[["CCSD(T)/CBS/CP", "MP2/CBS/CP", "CCSD(T)/aDZ/CP", "MP2/aDZ/CP"]])
+    if 'corr_CCSD(T)/aDZ' in df.columns:
+        df["CCSD(T)/CBS/CP"] = (
+            df["HF/aQZ"]
+            + df["corr_MP2/CBS(aTQZ)"]
+            + df["corr_CCSD(T)/aDZ"]
+            - df["corr_MP2/aDZ"]
+        )
+    else:
+        df["CCSD(T)/CBS/CP"] = (
+            df["HF/aQZ"]
+            + df["corr_MP2/CBS(aTQZ)"]
+            + df["corr_CCSD(T)/haTZ"]
+            - df["corr_MP2/haTZ"]
+        )
+    print(df[['CCSD(T)/CBS/CP', 'MP2/CBS/CP']].describe())
     return df
 
 
@@ -285,6 +292,7 @@ def plot_violin_errors():
         ]
         print(f)
         print(df[['HF/aug-cc-pVDZ/CP Error', 'dAPNet2+HF/aug-cc-pVDZ/CP Error']].describe())
+        print(len(df), df[['processing_error']])
         db_name = f.split("/")[-1].replace("_dapnet.pkl", ".png")
         error_statistics.violin_plot_table_multi_SAPT_components(
             dfs,
@@ -317,24 +325,27 @@ def plot_violin_errors():
 
 
 def dapnet_errors():
-    for f in glob.glob("dfs/*.pkl"):
+    # for f in glob.glob("dfs/*.pkl"):
+    for f in glob.glob("dfs/NCIA_R739x5.pkl"):
         if "_dapnet" in f:
             continue
         print(f)
         df = pd.read_pickle(f)
+        df = update_colunn_names_to_match_bfdb(df)
         df = update_column_names(df)
         pp(df.columns.values.tolist())
         len_df = len(df)
         df = drop_error_columns(df)
         print(f"Dropped {len_df - len(df)} rows with processing errors ({len_df})")
         for k in lots.values():
+            print(k)
             try:
                 df[f"{k} Error"] = df[k] - df["CCSD(T)/CBS/CP"]
                 df, col = delta_model_errors(df, m1=k, m2="CCSD(T)/CBS/CP")
                 df[f"dAPNet2+{k} Error"] = df[f"{k} Error"] + df[col]
                 print(df[[f"{k} Error", f"dAPNet2+{k} Error"]].describe())
-            except KeyError:
-                print("KeyError: ", k)
+            except KeyError as e:
+                print("KeyError: ", k, e)
                 df[f"{k} Error"] = [0.0 for i in range(len(df))]
                 df[f"dAPNet2+{k} Error"] = [0.0 for i in range(len(df))]
         db_name = f.split("/")[-1].replace(".pkl", ".png")
@@ -347,7 +358,7 @@ def main():
     # dfs = create_pandas_dfs()
     # pp(dfs)
     # return
-    # dapnet_errors()
+    dapnet_errors()
     plot_violin_errors()
     return
 
